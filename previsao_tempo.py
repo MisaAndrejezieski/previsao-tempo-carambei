@@ -1,7 +1,6 @@
 import json
 import os
 import pickle
-import threading
 import time
 import tkinter as tk
 import webbrowser
@@ -30,13 +29,6 @@ class PrevisaoTempoApp:
         self.root.minsize(1000, 700)
         self.root.resizable(True, True)
         
-        # Modo escuro/claro
-        self.modo_escuro = True
-        
-        # Histórico de cidades
-        self.historico = []
-        self.carregar_historico()
-        
         # Cores neon pasteis
         self.cores = {
             'bg': '#0a0a1a',
@@ -56,27 +48,89 @@ class PrevisaoTempoApp:
             'neon_prata': '#c0c0c0'
         }
         
-        self.configurar_estilos()
-        self.criar_widgets()
-        self.atualizar_relogio()
-        self.carregar_cidade_padrao()
-    
-    def configurar_estilos(self):
-        """Configura o tema e estilos"""
+        # Configurar fundo
         self.root.configure(bg=self.cores['bg'])
         
-        # Frame principal
-        self.main_frame = tk.Frame(self.root, bg=self.cores['bg'])
-        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        # Histórico e favoritos
+        self.historico = []
+        self.favoritos = []
+        self.carregar_historico()
+        self.carregar_favoritos()
         
-        # Barra superior com relógio
-        self.top_bar = tk.Frame(self.main_frame, bg=self.cores['bg_frame'], height=60)
-        self.top_bar.pack(fill=tk.X, pady=(0, 10))
-        self.top_bar.pack_propagate(False)
+        # Variáveis
+        self.localizacao_atual = None
+        self.modo_escuro = True
+        
+        # Criar interface
+        self.criar_menu()
+        self.criar_widgets()
+        
+        # Atualizar relógio
+        self.atualizar_relogio()
+        
+        # Carregar cidade padrão
+        self.root.after(100, self.carregar_cidade_padrao)
+        
+        # Atalhos de teclado
+        self.configurar_atalhos()
+        
+        # Mostrar splash
+        self.root.after(50, self.mostrar_splash)
+    
+    def criar_menu(self):
+        """Cria a barra de menu"""
+        menu_bar = Menu(self.root, bg=self.cores['bg_frame'], fg=self.cores['texto_claro'])
+        self.root.config(menu=menu_bar)
+        
+        # Menu Arquivo
+        file_menu = Menu(menu_bar, tearoff=0, bg=self.cores['bg_frame'], fg=self.cores['texto_claro'])
+        menu_bar.add_cascade(label="📁 Arquivo", menu=file_menu)
+        file_menu.add_command(label="📄 Exportar PDF", command=self.exportar_pdf)
+        file_menu.add_command(label="🖨️ Imprimir", command=self.imprimir_relatorio)
+        file_menu.add_separator()
+        file_menu.add_command(label="❌ Sair", command=self.root.quit)
+        
+        # Menu Clima
+        clima_menu = Menu(menu_bar, tearoff=0, bg=self.cores['bg_frame'], fg=self.cores['texto_claro'])
+        menu_bar.add_cascade(label="🌤️ Clima", menu=clima_menu)
+        clima_menu.add_command(label="🔄 Atualizar", command=self.atualizar_clima)
+        clima_menu.add_command(label="📊 Detalhes", command=self.mostrar_detalhes)
+        clima_menu.add_command(label="📅 Previsão 7 Dias", command=self.mostrar_previsao_semana)
+        
+        # Menu Ferramentas
+        tools_menu = Menu(menu_bar, tearoff=0, bg=self.cores['bg_frame'], fg=self.cores['texto_claro'])
+        menu_bar.add_cascade(label="🛠️ Ferramentas", menu=tools_menu)
+        tools_menu.add_command(label="🗺️ Mapa", command=self.gerar_mapa)
+        tools_menu.add_command(label="📈 Gráfico", command=self.mostrar_grafico)
+        tools_menu.add_command(label="⭐ Favoritos", command=self.mostrar_favoritos)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="🔄 Alternar Tema", command=self.alternar_tema)
+        
+        # Menu Ajuda
+        help_menu = Menu(menu_bar, tearoff=0, bg=self.cores['bg_frame'], fg=self.cores['texto_claro'])
+        menu_bar.add_cascade(label="❓ Ajuda", menu=help_menu)
+        help_menu.add_command(label="📖 Sobre", command=self.mostrar_sobre)
+        help_menu.add_command(label="⌨️ Atalhos", command=self.mostrar_atalhos)
+    
+    def configurar_atalhos(self):
+        """Configura atalhos de teclado"""
+        self.root.bind('<Control-d>', lambda e: self.mostrar_detalhes())
+        self.root.bind('<Control-p>', lambda e: self.mostrar_previsao_semana())
+        self.root.bind('<Control-m>', lambda e: self.gerar_mapa())
+        self.root.bind('<Control-g>', lambda e: self.mostrar_grafico())
+        self.root.bind('<Control-r>', lambda e: self.atualizar_clima())
+        self.root.bind('<Control-l>', lambda e: self.limpar_texto())
+        self.root.bind('<F1>', lambda e: self.mostrar_atalhos())
+        self.root.bind('<Control-f>', lambda e: self.adicionar_favorito())
     
     def criar_widgets(self):
         """Cria todos os widgets da interface"""
-        # Título na barra superior
+        # Barra superior
+        self.top_bar = tk.Frame(self.root, bg=self.cores['bg_frame'], height=60)
+        self.top_bar.pack(fill=tk.X, pady=(0, 10))
+        self.top_bar.pack_propagate(False)
+        
+        # Título
         titulo_label = tk.Label(self.top_bar,
                                text="🌤️ PREVISÃO DO TEMPO NEON",
                                font=('Segoe UI', 18, 'bold'),
@@ -84,19 +138,27 @@ class PrevisaoTempoApp:
                                bg=self.cores['bg_frame'])
         titulo_label.pack(side=tk.LEFT, padx=20, pady=10)
         
-        # Relógio na barra superior
+        # Versão
+        versao_label = tk.Label(self.top_bar,
+                               text="v3.0 ULTIMATE",
+                               font=('Segoe UI', 9, 'bold'),
+                               fg=self.cores['neon_rosa'],
+                               bg=self.cores['bg_frame'])
+        versao_label.pack(side=tk.LEFT, padx=5, pady=10)
+        
+        # Relógio
         self.relogio_label = tk.Label(self.top_bar,
                                      font=('Segoe UI', 14, 'bold'),
                                      fg=self.cores['neon_verde'],
                                      bg=self.cores['bg_frame'])
         self.relogio_label.pack(side=tk.RIGHT, padx=20, pady=10)
         
-        # Frame principal de conteúdo
-        content_frame = tk.Frame(self.main_frame, bg=self.cores['bg'])
+        # Frame principal
+        content_frame = tk.Frame(self.root, bg=self.cores['bg'])
         content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        # Coluna esquerda (busca e controles)
-        left_frame = tk.Frame(content_frame, bg=self.cores['bg'], width=300)
+        # Coluna esquerda
+        left_frame = tk.Frame(content_frame, bg=self.cores['bg'], width=320)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
         left_frame.pack_propagate(False)
         
@@ -121,7 +183,7 @@ class PrevisaoTempoApp:
         self.entry_cidade.pack(fill=tk.X, padx=10, pady=5)
         self.entry_cidade.bind('<Return>', lambda e: self.buscar_cidade())
         
-        # Botões principais
+        # Botão buscar
         btn_buscar = tk.Button(search_frame,
                               text="🔍 BUSCAR CLIMA",
                               font=('Segoe UI', 10, 'bold'),
@@ -136,7 +198,7 @@ class PrevisaoTempoApp:
                               command=self.buscar_cidade)
         btn_buscar.pack(fill=tk.X, padx=10, pady=5)
         
-        # Sugestões rápidas
+        # Sugestões
         tk.Label(search_frame,
                 text="📍 Sugestões Rápidas",
                 font=('Segoe UI', 10),
@@ -172,6 +234,7 @@ class PrevisaoTempoApp:
             ("🗺️ Mapa", self.gerar_mapa, self.cores['neon_amarelo']),
             ("📈 Gráfico", self.mostrar_grafico, self.cores['neon_verde']),
             ("📄 PDF", self.exportar_pdf, self.cores['neon_rosa']),
+            ("⭐ Favoritar", self.adicionar_favorito, self.cores['neon_dourado']),
             ("🗑️ Limpar", self.limpar_texto, self.cores['neon_vermelho'])
         ]
         
@@ -189,6 +252,7 @@ class PrevisaoTempoApp:
                            cursor='hand2',
                            command=comando)
             btn.pack(fill=tk.X, pady=3)
+            self.aplicar_efeito_glow(btn, cor)
         
         # Histórico
         tk.Label(left_frame,
@@ -198,7 +262,7 @@ class PrevisaoTempoApp:
                 bg=self.cores['bg']).pack(pady=(10, 5))
         
         self.historico_listbox = tk.Listbox(left_frame,
-                                           height=5,
+                                           height=4,
                                            bg=self.cores['bg_frame'],
                                            fg=self.cores['texto_claro'],
                                            selectbackground=self.cores['neon_azul'],
@@ -206,7 +270,33 @@ class PrevisaoTempoApp:
                                            font=('Segoe UI', 9))
         self.historico_listbox.pack(fill=tk.X, pady=5)
         self.historico_listbox.bind('<Double-Button-1>', self.carregar_do_historico)
+        
+        # Favoritos
+        tk.Label(left_frame,
+                text="⭐ Favoritos",
+                font=('Segoe UI', 10, 'bold'),
+                fg=self.cores['neon_dourado'],
+                bg=self.cores['bg']).pack(pady=(5, 5))
+        
+        self.favoritos_listbox = tk.Listbox(left_frame,
+                                           height=3,
+                                           bg=self.cores['bg_frame'],
+                                           fg=self.cores['texto_claro'],
+                                           selectbackground=self.cores['neon_dourado'],
+                                           relief=tk.FLAT,
+                                           font=('Segoe UI', 9))
+        self.favoritos_listbox.pack(fill=tk.X, pady=5)
+        self.favoritos_listbox.bind('<Double-Button-1>', self.carregar_do_favorito)
+        
         self.atualizar_historico_listbox()
+        self.atualizar_favoritos_listbox()
+        
+        # Barra de progresso
+        self.progress_bar = ttk.Progressbar(left_frame,
+                                           mode='indeterminate',
+                                           style='Neon.Horizontal.TProgressbar')
+        self.progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_bar.pack_forget()
         
         # Status
         self.status_var = tk.StringVar()
@@ -222,11 +312,11 @@ class PrevisaoTempoApp:
                              relief=tk.SUNKEN)
         status_bar.pack(fill=tk.X, pady=(10, 0))
         
-        # Área principal (texto + gráficos)
+        # Área principal
         right_frame = tk.Frame(content_frame, bg=self.cores['bg'])
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
-        # Notebook para abas
+        # Notebook
         self.notebook = ttk.Notebook(right_frame)
         self.notebook.pack(fill=tk.BOTH, expand=True)
         
@@ -252,11 +342,11 @@ class PrevisaoTempoApp:
         self.figura_frame = tk.Frame(grafico_tab, bg=self.cores['bg'])
         self.figura_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Configurar tags de texto
+        # Configurar tags
         self.configurar_tags()
     
     def configurar_tags(self):
-        """Configura as tags de formatação do texto"""
+        """Configura tags de formatação do texto"""
         tags = {
             'titulo': ('Segoe UI', 16, 'bold', self.cores['neon_azul']),
             'subtitulo': ('Segoe UI', 13, 'bold', self.cores['neon_roxo']),
@@ -274,6 +364,67 @@ class PrevisaoTempoApp:
             elif len(resto) == 2:
                 self.text_area.tag_configure(nome, font=(fonte, tamanho, resto[0]), foreground=resto[1])
     
+    def aplicar_efeito_glow(self, widget, cor):
+        """Aplica efeito de brilho neon nos botões"""
+        widget.bind('<Enter>', lambda e: widget.config(
+            bg=cor,
+            fg=self.cores['bg'],
+            font=('Segoe UI', 9, 'bold'),
+            relief=tk.RAISED,
+            bd=2
+        ))
+        widget.bind('<Leave>', lambda e: widget.config(
+            bg=cor,
+            fg=self.cores['bg'],
+            font=('Segoe UI', 9, 'bold'),
+            relief=tk.FLAT,
+            bd=0
+        ))
+    
+    def mostrar_splash(self):
+        """Mostra tela de apresentação"""
+        splash = tk.Toplevel(self.root)
+        splash.overrideredirect(True)
+        splash.geometry('500x350')
+        splash.configure(bg='#0a0a1a')
+        
+        # Centralizar
+        x = (self.root.winfo_screenwidth() - 500) // 2
+        y = (self.root.winfo_screenheight() - 350) // 2
+        splash.geometry(f'+{x}+{y}')
+        
+        # Conteúdo
+        tk.Label(splash,
+                text='🌤️',
+                font=('Segoe UI', 70),
+                bg='#0a0a1a').pack(pady=20)
+        
+        tk.Label(splash,
+                text='PREVISÃO DO TEMPO NEON',
+                font=('Segoe UI', 20, 'bold'),
+                fg='#4ecdc4',
+                bg='#0a0a1a').pack()
+        
+        tk.Label(splash,
+                text='✨ ULTIMATE EDITION v3.0 ✨',
+                font=('Segoe UI', 14, 'bold'),
+                fg='#ff6b9d',
+                bg='#0a0a1a').pack(pady=5)
+        
+        tk.Label(splash,
+                text='Carregando...',
+                font=('Segoe UI', 10),
+                fg='#7bed9f',
+                bg='#0a0a1a').pack(pady=20)
+        
+        # Barra de progresso
+        progress = ttk.Progressbar(splash, length=300, mode='indeterminate')
+        progress.pack()
+        progress.start()
+        
+        # Fechar após 2.5 segundos
+        splash.after(2500, splash.destroy)
+    
     def atualizar_relogio(self):
         """Atualiza o relógio em tempo real"""
         agora = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
@@ -281,7 +432,7 @@ class PrevisaoTempoApp:
         self.root.after(1000, self.atualizar_relogio)
     
     def carregar_historico(self):
-        """Carrega o histórico de cidades"""
+        """Carrega histórico de cidades"""
         try:
             if os.path.exists('historico.pkl'):
                 with open('historico.pkl', 'rb') as f:
@@ -290,27 +441,41 @@ class PrevisaoTempoApp:
             self.historico = []
     
     def salvar_historico(self):
-        """Salva o histórico de cidades"""
+        """Salva histórico de cidades"""
         try:
             with open('historico.pkl', 'wb') as f:
-                pickle.dump(self.historico[-20:], f)  # Mantém apenas as últimas 20
+                pickle.dump(self.historico[-20:], f)
+        except:
+            pass
+    
+    def carregar_favoritos(self):
+        """Carrega lista de favoritos"""
+        try:
+            if os.path.exists('favoritos.pkl'):
+                with open('favoritos.pkl', 'rb') as f:
+                    self.favoritos = pickle.load(f)
+        except:
+            self.favoritos = []
+    
+    def salvar_favoritos(self):
+        """Salva lista de favoritos"""
+        try:
+            with open('favoritos.pkl', 'wb') as f:
+                pickle.dump(self.favoritos, f)
         except:
             pass
     
     def atualizar_historico_listbox(self):
-        """Atualiza a lista de histórico"""
+        """Atualiza listbox de histórico"""
         self.historico_listbox.delete(0, tk.END)
         for cidade in reversed(self.historico[-10:]):
             self.historico_listbox.insert(tk.END, cidade)
     
-    def carregar_do_historico(self, event):
-        """Carrega cidade do histórico ao dar duplo clique"""
-        try:
-            index = self.historico_listbox.curselection()[0]
-            cidade = self.historico_listbox.get(index)
-            self.set_cidade(cidade)
-        except:
-            pass
+    def atualizar_favoritos_listbox(self):
+        """Atualiza listbox de favoritos"""
+        self.favoritos_listbox.delete(0, tk.END)
+        for cidade in self.favoritos:
+            self.favoritos_listbox.insert(tk.END, cidade)
     
     def carregar_cidade_padrao(self):
         """Carrega a última cidade pesquisada"""
@@ -397,6 +562,131 @@ class PrevisaoTempoApp:
         self.cidade_var.set(cidade)
         self.buscar_cidade()
     
+    def carregar_do_historico(self, event):
+        """Carrega cidade do histórico ao dar duplo clique"""
+        try:
+            index = self.historico_listbox.curselection()[0]
+            cidade = self.historico_listbox.get(index)
+            self.set_cidade(cidade)
+        except:
+            pass
+    
+    def carregar_do_favorito(self, event):
+        """Carrega cidade dos favoritos ao dar duplo clique"""
+        try:
+            index = self.favoritos_listbox.curselection()[0]
+            cidade = self.favoritos_listbox.get(index)
+            self.set_cidade(cidade)
+        except:
+            pass
+    
+    def adicionar_favorito(self):
+        """Adiciona cidade atual aos favoritos"""
+        if hasattr(self, 'localizacao_atual') and self.localizacao_atual:
+            cidade = self.localizacao_atual['nome']
+            if cidade not in self.favoritos:
+                self.favoritos.append(cidade)
+                self.salvar_favoritos()
+                self.atualizar_favoritos_listbox()
+                self.status_var.set(f"⭐ {cidade} adicionado aos favoritos!")
+                self.mostrar_toast(f"⭐ {cidade} favoritado!")
+            else:
+                self.status_var.set(f"⚠️ {cidade} já está nos favoritos!")
+        else:
+            self.status_var.set("⚠️ Nenhuma cidade selecionada!")
+    
+    def mostrar_favoritos(self):
+        """Mostra lista de favoritos"""
+        if self.favoritos:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "✦" * 40 + "\n", 'separador')
+            self.text_area.insert(tk.END, "  ⭐ CID FAVORITAS ⭐\n", 'titulo')
+            self.text_area.insert(tk.END, "✦" * 40 + "\n\n", 'separador')
+            
+            for i, cidade in enumerate(self.favoritos, 1):
+                self.text_area.insert(tk.END, f"  {i}. {cidade}\n", 'neon_dourado')
+            
+            self.text_area.insert(tk.END, "\n✦" * 40 + "\n", 'separador')
+            self.text_area.insert(tk.END, "  💫 Duplo clique na lista para carregar\n", 'info')
+            self.status_var.set(f"⭐ {len(self.favoritos)} cidades favoritas")
+        else:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "⚠️ Nenhuma cidade favorita ainda!\n", 'erro')
+            self.text_area.insert(tk.END, "Clique em '⭐ Favoritar' para adicionar.\n", 'info')
+    
+    def mostrar_toast(self, message, duration=3000):
+        """Mostra notificação toast"""
+        try:
+            toast = tk.Toplevel(self.root)
+            toast.overrideredirect(True)
+            toast.configure(bg=self.cores['bg_frame'])
+            
+            x = self.root.winfo_x() + self.root.winfo_width() - 350
+            y = self.root.winfo_y() + self.root.winfo_height() - 100
+            toast.geometry(f'300x50+{x}+{y}')
+            
+            frame = tk.Frame(toast, bg=self.cores['neon_azul'], bd=2)
+            frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+            
+            tk.Label(frame,
+                    text=f'✨ {message}',
+                    font=('Segoe UI', 10),
+                    fg=self.cores['texto_claro'],
+                    bg=self.cores['bg_frame']).pack(expand=True)
+            
+            toast.after(duration, toast.destroy)
+        except:
+            pass
+    
+    def alternar_tema(self):
+        """Alterna entre tema escuro e claro"""
+        # Implementação simplificada
+        self.modo_escuro = not self.modo_escuro
+        if self.modo_escuro:
+            self.status_var.set("🌙 Tema escuro ativado")
+        else:
+            self.status_var.set("☀️ Tema claro ativado")
+    
+    def mostrar_sobre(self):
+        """Mostra informações sobre o programa"""
+        messagebox.showinfo(
+            "Sobre",
+            "🌤️ PREVISÃO DO TEMPO NEON\n"
+            "✨ ULTIMATE EDITION v3.0 ✨\n\n"
+            "Dados fornecidos por Open-Meteo API\n"
+            "Mapas com Folium\n"
+            "Gráficos com Matplotlib\n"
+            "PDF com ReportLab\n\n"
+            "Desenvolvido com ❤️ em Python"
+        )
+    
+    def mostrar_atalhos(self):
+        """Mostra atalhos de teclado"""
+        messagebox.showinfo(
+            "⌨️ Atalhos de Teclado",
+            "Ctrl + D - Detalhes\n"
+            "Ctrl + P - Previsão 7 Dias\n"
+            "Ctrl + M - Mapa\n"
+            "Ctrl + G - Gráfico\n"
+            "Ctrl + R - Atualizar\n"
+            "Ctrl + L - Limpar\n"
+            "Ctrl + F - Favoritar\n"
+            "F1 - Ajuda"
+        )
+    
+    def imprimir_relatorio(self):
+        """Imprime o relatório (simulação)"""
+        messagebox.showinfo("Imprimir", "Função de impressão em desenvolvimento!")
+    
+    def mostrar_barra_progresso(self, show=True):
+        """Mostra/oculta barra de progresso"""
+        if show:
+            self.progress_bar.pack(fill=tk.X, pady=5)
+            self.progress_bar.start()
+        else:
+            self.progress_bar.stop()
+            self.progress_bar.pack_forget()
+    
     def atualizar_clima(self):
         """Atualiza a previsão do tempo resumida"""
         self.text_area.delete(1.0, tk.END)
@@ -407,11 +697,13 @@ class PrevisaoTempoApp:
             self.status_var.set("⚠️ Digite o nome da cidade")
             return
         
+        self.mostrar_barra_progresso(True)
         self.status_var.set(f"🌟 Buscando {cidade}... 🌟")
         self.root.update()
         
         localizacao = self.geocodificar(cidade)
         if not localizacao:
+            self.mostrar_barra_progresso(False)
             self.text_area.insert(tk.END, f"❌ Cidade '{cidade}' não encontrada!\n", 'erro')
             self.text_area.insert(tk.END, "Verifique o nome e tente novamente.\n", 'info')
             self.status_var.set("❌ Cidade não encontrada")
@@ -426,6 +718,8 @@ class PrevisaoTempoApp:
             self.atualizar_historico_listbox()
         
         dados_clima = self.buscar_dados_clima(localizacao['latitude'], localizacao['longitude'])
+        self.mostrar_barra_progresso(False)
+        
         if not dados_clima:
             self.text_area.insert(tk.END, "❌ Erro ao buscar dados climáticos!\n", 'erro')
             self.status_var.set("❌ Erro ao buscar dados")
@@ -453,10 +747,11 @@ class PrevisaoTempoApp:
         self.text_area.insert(tk.END, "✦" * 40 + "\n", 'separador')
         self.text_area.insert(tk.END, "  💫 Ações disponíveis:\n", 'info')
         self.text_area.insert(tk.END, "  📊 Detalhes  |  📅 7 Dias  |  🗺️ Mapa\n", 'neon_laranja')
-        self.text_area.insert(tk.END, "  📈 Gráfico  |  📄 PDF  |  🗑️ Limpar\n", 'neon_laranja')
+        self.text_area.insert(tk.END, "  📈 Gráfico  |  📄 PDF  |  ⭐ Favoritar\n", 'neon_laranja')
         self.text_area.insert(tk.END, "✦" * 40 + "\n", 'separador')
         
         self.status_var.set(f"✨ {localizacao['nome']} atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} ✨")
+        self.mostrar_toast(f"Clima de {localizacao['nome']} atualizado!")
     
     def mostrar_detalhes(self):
         """Mostra os detalhes completos"""
@@ -467,10 +762,13 @@ class PrevisaoTempoApp:
         local = self.localizacao_atual
         cidade = local['nome']
         
+        self.mostrar_barra_progresso(True)
         self.status_var.set(f"🌟 Carregando detalhes para {cidade}... 🌟")
         self.root.update()
         
         dados_clima = self.buscar_dados_clima(local['latitude'], local['longitude'])
+        self.mostrar_barra_progresso(False)
+        
         if not dados_clima:
             self.text_area.delete(1.0, tk.END)
             self.text_area.insert(tk.END, "❌ Erro ao buscar dados climáticos!\n", 'erro')
@@ -515,10 +813,13 @@ class PrevisaoTempoApp:
         local = self.localizacao_atual
         cidade = local['nome']
         
+        self.mostrar_barra_progresso(True)
         self.status_var.set(f"🌟 Carregando previsão para {cidade}... 🌟")
         self.root.update()
         
         dados_clima = self.buscar_dados_clima(local['latitude'], local['longitude'])
+        self.mostrar_barra_progresso(False)
+        
         if not dados_clima:
             self.text_area.delete(1.0, tk.END)
             self.text_area.insert(tk.END, "❌ Erro ao buscar dados climáticos!\n", 'erro')
@@ -565,10 +866,13 @@ class PrevisaoTempoApp:
         local = self.localizacao_atual
         cidade = local['nome']
         
+        self.mostrar_barra_progresso(True)
         self.status_var.set(f"🌟 Gerando gráfico para {cidade}... 🌟")
         self.root.update()
         
         dados_clima = self.buscar_dados_clima(local['latitude'], local['longitude'])
+        self.mostrar_barra_progresso(False)
+        
         if not dados_clima:
             messagebox.showerror("Erro", "Não foi possível buscar os dados climáticos!")
             return
@@ -623,6 +927,7 @@ class PrevisaoTempoApp:
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
         self.status_var.set(f"✨ Gráfico de {cidade} gerado com sucesso! ✨")
+        self.mostrar_toast(f"📈 Gráfico de {cidade} gerado!")
     
     def gerar_mapa(self):
         """Gera e abre um mapa interativo"""
@@ -632,6 +937,10 @@ class PrevisaoTempoApp:
         
         local = self.localizacao_atual
         cidade = local['nome']
+        
+        self.mostrar_barra_progresso(True)
+        self.status_var.set(f"🗺️ Gerando mapa para {cidade}...")
+        self.root.update()
         
         try:
             mapa = folium.Map(
@@ -662,9 +971,14 @@ class PrevisaoTempoApp:
             mapa.save(mapa_path)
             webbrowser.open(f'file://{mapa_path}')
             
+            self.mostrar_barra_progresso(False)
             self.status_var.set(f"🗺️ Mapa de {cidade} aberto no navegador")
+            self.mostrar_toast(f"🗺️ Mapa de {cidade} gerado!")
+            
         except Exception as e:
+            self.mostrar_barra_progresso(False)
             messagebox.showerror("Erro", f"Erro ao gerar mapa: {str(e)}")
+            self.status_var.set("❌ Erro ao gerar mapa")
     
     def exportar_pdf(self):
         """Exporta o relatório do clima para PDF"""
@@ -675,11 +989,14 @@ class PrevisaoTempoApp:
         local = self.localizacao_atual
         cidade = local['nome']
         
+        self.mostrar_barra_progresso(True)
         self.status_var.set(f"📄 Gerando PDF para {cidade}...")
         self.root.update()
         
         dados_clima = self.buscar_dados_clima(local['latitude'], local['longitude'])
+        
         if not dados_clima:
+            self.mostrar_barra_progresso(False)
             messagebox.showerror("Erro", "Não foi possível buscar os dados climáticos!")
             return
         
@@ -756,13 +1073,16 @@ class PrevisaoTempoApp:
             # Gerar PDF
             doc.build(story)
             
+            self.mostrar_barra_progresso(False)
             messagebox.showinfo("Sucesso", f"PDF gerado com sucesso!\nArquivo: {pdf_path}")
             self.status_var.set(f"📄 PDF gerado: {pdf_path}")
+            self.mostrar_toast(f"📄 PDF de {cidade} gerado!")
             
             # Abrir o PDF
             os.startfile(pdf_path) if os.name == 'nt' else webbrowser.open(pdf_path)
             
         except Exception as e:
+            self.mostrar_barra_progresso(False)
             messagebox.showerror("Erro", f"Erro ao gerar PDF: {str(e)}")
             self.status_var.set("❌ Erro ao gerar PDF")
     
