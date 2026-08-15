@@ -1,9 +1,12 @@
 import json
+import os
 import time
 import tkinter as tk
+import webbrowser
 from datetime import datetime, timedelta
-from tkinter import scrolledtext, ttk
+from tkinter import messagebox, scrolledtext, ttk
 
+import folium
 import requests
 
 
@@ -11,7 +14,7 @@ class PrevisaoTempoApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Previsão do Tempo - Seu Clima Neon")
-        self.root.geometry("900x750")
+        self.root.geometry("950x800")
         self.root.resizable(True, True)
         
         # Cores neon pasteis
@@ -39,7 +42,7 @@ class PrevisaoTempoApp:
         
         # Configurar grid
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(6, weight=1)
+        main_frame.rowconfigure(5, weight=1)
         
         # Título
         titulo_frame = tk.Frame(main_frame, bg=self.cores['bg'])
@@ -53,7 +56,7 @@ class PrevisaoTempoApp:
         titulo.pack()
         
         subtitulo = tk.Label(titulo_frame,
-                            text="✦ Dados precisos da Open-Meteo API ✦",
+                            text="✦ Dados precisos da Open-Meteo API com mapa interativo ✦",
                             font=('Segoe UI', 11, 'italic'),
                             fg=self.cores['neon_roxo'],
                             bg=self.cores['bg'])
@@ -174,6 +177,20 @@ class PrevisaoTempoApp:
                                      command=self.mostrar_previsao_semana)
         self.btn_previsao.pack(side=tk.LEFT, padx=5, pady=5)
         
+        self.btn_mapa = tk.Button(button_frame,
+                                 text="🗺️ Ver Mapa",
+                                 font=('Segoe UI', 10, 'bold'),
+                                 fg=self.cores['bg'],
+                                 bg=self.cores['neon_amarelo'],
+                                 activebackground=self.cores['neon_roxo'],
+                                 activeforeground=self.cores['bg'],
+                                 relief=tk.FLAT,
+                                 padx=15,
+                                 pady=8,
+                                 cursor='hand2',
+                                 command=self.gerar_mapa)
+        self.btn_mapa.pack(side=tk.LEFT, padx=5, pady=5)
+        
         self.btn_limpar = tk.Button(button_frame,
                                    text="🗑️ Limpar",
                                    font=('Segoe UI', 10, 'bold'),
@@ -241,6 +258,9 @@ class PrevisaoTempoApp:
                                     font=('Segoe UI', 10, 'bold'))
         self.text_area.tag_configure('neon_laranja',
                                     foreground=self.cores['neon_laranja'])
+        
+        # Variável para armazenar localização atual
+        self.localizacao_atual = None
         
         # Carregar dados iniciais
         self.root.after(100, self.atualizar_clima)
@@ -344,6 +364,8 @@ class PrevisaoTempoApp:
             self.status_var.set("❌ Cidade não encontrada")
             return
         
+        self.localizacao_atual = localizacao
+        
         # Buscar clima
         dados_clima = self.buscar_dados_clima(localizacao['latitude'], localizacao['longitude'])
         if not dados_clima:
@@ -374,9 +396,10 @@ class PrevisaoTempoApp:
         self.text_area.insert(tk.END, f"  🌧️  Precipitação: {precip} mm\n\n", 'info')
         
         self.text_area.insert(tk.END, "✦" * 35 + "\n", 'separador')
-        self.text_area.insert(tk.END, "  💫 Para mais detalhes:\n", 'info')
+        self.text_area.insert(tk.END, "  💫 Para mais informações:\n", 'info')
         self.text_area.insert(tk.END, "  📊 'Detalhes Completos'\n", 'neon_laranja')
         self.text_area.insert(tk.END, "  📅 'Previsão 7 Dias'\n", 'neon_laranja')
+        self.text_area.insert(tk.END, "  🗺️ 'Ver Mapa' para visualizar no mapa\n", 'neon_laranja')
         self.text_area.insert(tk.END, "✦" * 35 + "\n", 'separador')
         
         self.status_var.set(f"✨ {localizacao['nome']} atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} ✨")
@@ -400,6 +423,8 @@ class PrevisaoTempoApp:
             self.text_area.insert(tk.END, f"❌ Cidade '{cidade}' não encontrada!\n", 'erro')
             self.status_var.set("❌ Cidade não encontrada")
             return
+        
+        self.localizacao_atual = localizacao
         
         dados_clima = self.buscar_dados_clima(localizacao['latitude'], localizacao['longitude'])
         if not dados_clima:
@@ -440,6 +465,7 @@ class PrevisaoTempoApp:
         
         self.text_area.insert(tk.END, "✦" * 45 + "\n", 'separador')
         self.text_area.insert(tk.END, "💫 Dados fornecidos por Open-Meteo\n", 'info')
+        self.text_area.insert(tk.END, "🗺️ Clique em 'Ver Mapa' para visualizar no mapa\n", 'info')
         self.status_var.set(f"✨ Detalhes de {localizacao['nome']} atualizados ✨")
     
     def mostrar_previsao_semana(self):
@@ -461,6 +487,8 @@ class PrevisaoTempoApp:
             self.text_area.insert(tk.END, f"❌ Cidade '{cidade}' não encontrada!\n", 'erro')
             self.status_var.set("❌ Cidade não encontrada")
             return
+        
+        self.localizacao_atual = localizacao
         
         dados_clima = self.buscar_dados_clima(localizacao['latitude'], localizacao['longitude'])
         if not dados_clima:
@@ -485,7 +513,8 @@ class PrevisaoTempoApp:
         
         for i in range(min(7, len(datas))):
             data_obj = datetime.strptime(datas[i], '%Y-%m-%d')
-            nome_dia = data_obj.strftime('%A').upper()
+            dias_semana = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO']
+            nome_dia = dias_semana[data_obj.weekday()]
             data_formatada = data_obj.strftime('%d/%m')
             
             condicao = self.traduzir_clima(weather_codes[i] if i < len(weather_codes) else 0)
@@ -498,7 +527,72 @@ class PrevisaoTempoApp:
         
         self.text_area.insert(tk.END, "✦" * 50 + "\n", 'separador')
         self.text_area.insert(tk.END, "💫 Dados fornecidos por Open-Meteo\n", 'info')
+        self.text_area.insert(tk.END, "🗺️ Clique em 'Ver Mapa' para visualizar no mapa\n", 'info')
         self.status_var.set(f"✨ Previsão de {localizacao['nome']} atualizada ✨")
+    
+    def gerar_mapa(self):
+        """Gera e abre um mapa interativo da cidade"""
+        if not self.localizacao_atual:
+            cidade = self.cidade_var.get().strip()
+            if not cidade:
+                messagebox.showwarning("Aviso", "Digite o nome de uma cidade primeiro!")
+                return
+            
+            self.status_var.set(f"🌟 Buscando localização de {cidade}... 🌟")
+            self.root.update()
+            
+            localizacao = self.geocodificar(cidade)
+            if not localizacao:
+                messagebox.showerror("Erro", f"Cidade '{cidade}' não encontrada!")
+                return
+            self.localizacao_atual = localizacao
+        
+        try:
+            # Criar mapa
+            lat = self.localizacao_atual['latitude']
+            lon = self.localizacao_atual['longitude']
+            nome = self.localizacao_atual['nome']
+            pais = self.localizacao_atual['pais']
+            
+            # Criar mapa com estilo escuro neon
+            mapa = folium.Map(
+                location=[lat, lon],
+                zoom_start=13,
+                tiles='CartoDB dark_matter',
+                control_scale=True
+            )
+            
+            # Adicionar marcador personalizado
+            folium.Marker(
+                [lat, lon],
+                popup=f'<b>{nome}</b><br>{pais}',
+                tooltip=f'Clique para detalhes de {nome}',
+                icon=folium.Icon(color='pink', icon='cloud', prefix='fa')
+            ).add_to(mapa)
+            
+            # Adicionar círculo de destaque
+            folium.Circle(
+                [lat, lon],
+                radius=1000,
+                color='#ff6b9d',
+                fill=True,
+                fill_color='#ff6b9d',
+                fill_opacity=0.2,
+                popup=f'Área de {nome}'
+            ).add_to(mapa)
+            
+            # Salvar mapa
+            mapa_path = os.path.join(os.getcwd(), f'mapa_{nome}.html')
+            mapa.save(mapa_path)
+            
+            # Abrir no navegador
+            webbrowser.open(f'file://{mapa_path}')
+            
+            self.status_var.set(f"🗺️ Mapa de {nome} aberto no navegador")
+            
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao gerar mapa: {str(e)}")
+            self.status_var.set("❌ Erro ao gerar mapa")
     
     def limpar_texto(self):
         """Limpa a área de texto"""
