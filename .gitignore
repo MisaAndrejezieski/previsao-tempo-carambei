@@ -75,3 +75,7 @@ pyvenv.cfg
 # mypy
 .mypy_cache/
 .pytest_cache/
+
+# Mapas gerados
+*.html
+mapa_*.html
