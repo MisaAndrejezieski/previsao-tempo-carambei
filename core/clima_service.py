@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -6,7 +7,8 @@ from cachetools import TTLCache
 
 from config.settings import config
 from core.api_client import ApiClient
-from core.exceptions import CidadeNaoEncontradaError
+from core.exceptions import (ApiConnectionError, ApiTimeoutError,
+                             CidadeNaoEncontradaError)
 from core.models import (ClimaAtual, CondicaoClima, PrevisaoCompleta,
                          PrevisaoDia)
 
@@ -16,37 +18,63 @@ class ClimaService:
     def __init__(self):
         self.api = ApiClient()
         self.cache = TTLCache(maxsize=100, ttl=config.API_CACHE_TTL)
-        
+        self.offline_mode = False
+        self.ultimo_dado: Optional[PrevisaoCompleta] = None
+
+    def validar_cidade(self, cidade: str) -> str:
+        """Valida e normaliza o nome da cidade antes da busca."""
+        if cidade is None:
+            raise ValueError("Nome da cidade não pode ser vazio")
+
+        cidade = cidade.strip()
+        if len(cidade) < 2:
+            raise ValueError("Nome da cidade deve ter pelo menos 2 caracteres")
+        if len(cidade) > 100:
+            raise ValueError("Nome da cidade excedeu o limite de 100 caracteres")
+
+        if not re.fullmatch(r"[A-Za-zÀ-ÿ0-9\s\-\.]+", cidade):
+            raise ValueError("Nome da cidade contém caracteres inválidos")
+
+        return cidade
+
     def buscar_previsao(self, cidade: str) -> Optional[PrevisaoCompleta]:
-        """Busca previsão completa para uma cidade"""
+        """Busca previsão e usa fallback offline quando a API falha."""
+        cidade = self.validar_cidade(cidade)
         cache_key = cidade.lower().strip()
-        
-        # Tentar cache
+
+        if self.offline_mode and self.ultimo_dado is not None:
+            logger.warning(f"Modo offline ativo para {cidade}; retornando último dado válido")
+            return self.ultimo_dado
+
         if cache_key in self.cache:
             logger.info(f"Usando cache para {cidade}")
-            return self.cache[cache_key]
-        
+            previsao_cache = self.cache[cache_key]
+            self.ultimo_dado = previsao_cache
+            return previsao_cache
+
         try:
-            # Buscar coordenadas
             coords = self.api.geocodificar(cidade)
             if not coords:
                 logger.warning(f"Cidade não encontrada: {cidade}")
                 raise CidadeNaoEncontradaError(f"Cidade '{cidade}' não encontrada")
-            
-            # Buscar dados climáticos
+
             dados = self.api.buscar_clima(coords)
             if not dados:
                 logger.error(f"Falha ao buscar dados para {cidade}")
                 return None
-            
-            # Parsear dados
+
             previsao = self._parsear_previsao(coords, dados)
-            
-            # Salvar no cache
             self.cache[cache_key] = previsao
-            
+            self.ultimo_dado = previsao
+            self.offline_mode = False
             return previsao
-            
+
+        except (ApiConnectionError, ApiTimeoutError, ConnectionError, TimeoutError) as e:
+            logger.error(f"Falha de rede ao buscar {cidade}: {e}")
+            self.offline_mode = True
+            if self.ultimo_dado is not None:
+                return self.ultimo_dado
+            raise
         except Exception as e:
             logger.error(f"Erro ao buscar previsão: {e}")
             raise
