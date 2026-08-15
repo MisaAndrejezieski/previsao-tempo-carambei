@@ -57,21 +57,23 @@ class WeatherDisplay(tk.Frame):
                 self.text_area.tag_configure(nome, font=(fonte, tamanho, resto[0]), foreground=resto[1])
     
     def atualizar(self, previsao: PrevisaoCompleta):
-        """Atualiza com novos dados"""
+        """Atualiza com novos dados - MOSTRA A PREVISÃO COMPLETA!"""
         self.previsao = previsao
         self.text_area.delete(1.0, tk.END)
         
         atual = previsao.atual
         coords = atual.coordenadas
         
-        # Header
-        self.text_area.insert(tk.END, "✦" * 40 + "\n", 'separador')
+        # ============ CABEÇALHO ============
+        self.text_area.insert(tk.END, "✦" * 45 + "\n", 'separador')
         self.text_area.insert(tk.END, f"  🌸 {coords.cidade.upper()} - {coords.pais} 🌸\n", 'titulo')
-        self.text_area.insert(tk.END, f"  📍 {coords.regiao}\n", 'info')
-        self.text_area.insert(tk.END, "✦" * 40 + "\n\n", 'separador')
+        if coords.regiao:
+            self.text_area.insert(tk.END, f"  📍 {coords.regiao}\n", 'info')
+        self.text_area.insert(tk.END, "✦" * 45 + "\n\n", 'separador')
         
-        # Clima atual
+        # ============ CLIMA ATUAL ============
         condicao = atual.condicao
+        self.text_area.insert(tk.END, "🌡️ CLIMA ATUAL\n", 'subtitulo')
         self.text_area.insert(tk.END, f"  {condicao.icone} {condicao.descricao}\n\n", 'destaque')
         self.text_area.insert(tk.END, f"  🌡️  Temperatura: {atual.temperatura}°C\n", 'neon_laranja')
         self.text_area.insert(tk.END, f"  🌡️  Sensação: {atual.sensacao_termica}°C\n", 'info')
@@ -80,71 +82,64 @@ class WeatherDisplay(tk.Frame):
         self.text_area.insert(tk.END, f"  🌧️  Precipitação: {atual.precipitacao} mm\n", 'info')
         self.text_area.insert(tk.END, f"  ☁️  Nuvens: {atual.nuvens}%\n\n", 'info')
         
-        self.text_area.insert(tk.END, "✦" * 40 + "\n", 'separador')
-        self.text_area.insert(tk.END, f"  🕐 Atualizado: {atual.atualizado_em.strftime('%d/%m/%Y %H:%M')}\n", 'info')
-        self.text_area.insert(tk.END, "✦" * 40 + "\n", 'separador')
+        # ============ PREVISÃO 7 DIAS ============
+        if previsao.previsao_7dias:
+            self.text_area.insert(tk.END, "📅 PREVISÃO 7 DIAS\n", 'subtitulo')
+            self.text_area.insert(tk.END, "─" * 45 + "\n", 'separador')
+            
+            dias_semana = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO']
+            
+            for i, dia in enumerate(previsao.previsao_7dias[:7]):
+                nome_dia = dias_semana[dia.data.weekday()]
+                data_formatada = dia.data.strftime('%d/%m')
+                
+                # Dia
+                self.text_area.insert(tk.END, f"\n  📆 {nome_dia} - {data_formatada}\n", 'destaque')
+                
+                # Condição
+                self.text_area.insert(tk.END, f"     {dia.condicao.icone} {dia.condicao.descricao}\n", 'info')
+                
+                # Temperaturas
+                self.text_area.insert(tk.END, f"     🔥 Máx: {dia.temp_max}°C", 'neon_laranja')
+                self.text_area.insert(tk.END, f"  ❄️ Mín: {dia.temp_min}°C\n", 'neon_laranja')
+                
+                # Precipitação
+                if dia.precipitacao > 0:
+                    self.text_area.insert(tk.END, f"     🌧️  Precipitação: {dia.precipitacao} mm\n", 'info')
+                else:
+                    self.text_area.insert(tk.END, f"     ☀️  Sem chuva prevista\n", 'info')
+            
+            self.text_area.insert(tk.END, "\n" + "✦" * 45 + "\n", 'separador')
+        else:
+            self.text_area.insert(tk.END, "\n⚠️ Nenhuma previsão disponível\n", 'erro')
         
-        log.debug(f"Clima de {coords.cidade} atualizado")
+        # ============ RODAPÉ ============
+        self.text_area.insert(tk.END, f"\n🕐 Atualizado: {atual.atualizado_em.strftime('%d/%m/%Y %H:%M')}\n", 'info')
+        self.text_area.insert(tk.END, "✦" * 45 + "\n", 'separador')
+        self.text_area.insert(tk.END, "💫 Dados fornecidos por Open-Meteo\n", 'info')
+        
+        log.debug(f"Clima de {coords.cidade} atualizado com {len(previsao.previsao_7dias)} dias de previsão")
     
     def mostrar_detalhes(self):
-        """Mostra detalhes completos"""
+        """Mostra detalhes completos com previsão"""
         if not self.previsao:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "⚠️ Nenhum dado disponível\n", 'erro')
             return
         
-        atual = self.previsao.atual
-        coords = atual.coordenadas
-        
-        self.text_area.delete(1.0, tk.END)
-        
-        self.text_area.insert(tk.END, "✦" * 50 + "\n", 'separador')
-        self.text_area.insert(tk.END, f"  🌸 DETALHES - {coords.cidade.upper()} 🌸\n", 'titulo')
-        self.text_area.insert(tk.END, "✦" * 50 + "\n\n", 'separador')
-        
-        self.text_area.insert(tk.END, "📍 LOCALIZAÇÃO\n", 'subtitulo')
-        self.text_area.insert(tk.END, f"  Cidade: {coords.cidade}\n", 'info')
-        self.text_area.insert(tk.END, f"  Região: {coords.regiao}\n", 'info')
-        self.text_area.insert(tk.END, f"  País: {coords.pais}\n", 'info')
-        self.text_area.insert(tk.END, f"  Coordenadas: {coords.latitude}°, {coords.longitude}°\n\n", 'info')
-        
-        self.text_area.insert(tk.END, "🌡️ CONDIÇÕES ATUAIS\n", 'subtitulo')
-        condicao = atual.condicao
-        self.text_area.insert(tk.END, f"  {condicao.icone} {condicao.descricao}\n", 'destaque')
-        self.text_area.insert(tk.END, f"  🌡️  Temperatura: {atual.temperatura}°C\n", 'neon_laranja')
-        self.text_area.insert(tk.END, f"  🌡️  Sensação térmica: {atual.sensacao_termica}°C\n", 'info')
-        self.text_area.insert(tk.END, f"  💧  Umidade: {atual.umidade}%\n", 'info')
-        self.text_area.insert(tk.END, f"  💨  Vento: {atual.vento_kmh} km/h\n", 'info')
-        self.text_area.insert(tk.END, f"  🧭  Direção: {atual.direcao_vento}°\n", 'info')
-        self.text_area.insert(tk.END, f"  🌧️  Precipitação: {atual.precipitacao} mm\n", 'info')
-        self.text_area.insert(tk.END, f"  📊  Pressão: {atual.pressao} hPa\n", 'info')
-        self.text_area.insert(tk.END, f"  ☁️  Nebulosidade: {atual.nuvens}%\n\n", 'info')
-        
-        self.text_area.insert(tk.END, "✦" * 50 + "\n", 'separador')
-        self.text_area.insert(tk.END, "💫 Dados fornecidos por Open-Meteo\n", 'info')
+        # Simplesmente chama atualizar novamente
+        self.atualizar(self.previsao)
     
     def mostrar_previsao(self):
-        """Mostra previsão de 7 dias"""
+        """Mostra apenas a previsão (atalho)"""
         if not self.previsao:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "⚠️ Nenhum dado disponível\n", 'erro')
             return
         
-        self.text_area.delete(1.0, tk.END)
-        
-        self.text_area.insert(tk.END, "✦" * 55 + "\n", 'separador')
-        self.text_area.insert(tk.END, f"  📅 PREVISÃO 7 DIAS\n", 'titulo')
-        self.text_area.insert(tk.END, "✦" * 55 + "\n\n", 'separador')
-        
-        dias_semana = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO']
-        
-        for dia in self.previsao.previsao_7dias:
-            nome_dia = dias_semana[dia.data.weekday()]
-            data_formatada = dia.data.strftime('%d/%m')
-            
-            self.text_area.insert(tk.END, f"  📆 {nome_dia} - {data_formatada}\n", 'destaque')
-            self.text_area.insert(tk.END, f"     {dia.condicao.icone} {dia.condicao.descricao}\n", 'info')
-            self.text_area.insert(tk.END, f"     🔥 Máx: {dia.temp_max}°C  ❄️ Mín: {dia.temp_min}°C\n", 'neon_laranja')
-            self.text_area.insert(tk.END, f"     🌧️  Precipitação: {dia.precipitacao} mm\n\n", 'info')
-        
-        self.text_area.insert(tk.END, "✦" * 55 + "\n", 'separador')
-        self.text_area.insert(tk.END, "💫 Dados fornecidos por Open-Meteo\n", 'info')
+        # Mostra a previsão completa novamente
+        self.atualizar(self.previsao)
+        self.text_area.insert(tk.END, "\n📌 Pressione Ctrl+D para detalhes\n", 'info')
     
     def mostrar_erro(self, mensagem: str):
         """Mostra mensagem de erro"""
