@@ -1,6 +1,7 @@
 import json
+import time
 import tkinter as tk
-from datetime import datetime
+from datetime import datetime, timedelta
 from tkinter import scrolledtext, ttk
 
 import requests
@@ -9,35 +10,25 @@ import requests
 class PrevisaoTempoApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Previsão do Tempo - Carambeí")
-        self.root.geometry("850x650")
+        self.root.title("Previsão do Tempo - Seu Clima Neon")
+        self.root.geometry("900x750")
         self.root.resizable(True, True)
         
         # Cores neon pasteis
         self.cores = {
-            'bg': '#1a1a2e',           # Fundo escuro
-            'bg_frame': '#16213e',      # Fundo frames
-            'neon_rosa': '#ff6b9d',     # Rosa neon
-            'neon_azul': '#4ecdc4',     # Azul neon
-            'neon_verde': '#7bed9f',    # Verde neon
-            'neon_roxo': '#a29bfe',     # Roxo neon
-            'neon_amarelo': '#ffeaa7',  # Amarelo neon
-            'neon_laranja': '#fd79a8',  # Laranja neon
-            'texto_claro': '#dfe6e9',   # Texto claro
-            'texto_escuro': '#2d3436',  # Texto escuro
-            'status_bg': '#2d2d44',     # Fundo status
+            'bg': '#1a1a2e',
+            'bg_frame': '#16213e',
+            'neon_rosa': '#ff6b9d',
+            'neon_azul': '#4ecdc4',
+            'neon_verde': '#7bed9f',
+            'neon_roxo': '#a29bfe',
+            'neon_amarelo': '#ffeaa7',
+            'neon_laranja': '#fd79a8',
+            'texto_claro': '#dfe6e9',
+            'texto_escuro': '#2d3436',
+            'status_bg': '#2d2d44',
+            'neon_vermelho': '#ff4757'
         }
-        
-        # Configurar estilo
-        style = ttk.Style()
-        style.theme_use('clam')
-        
-        # Estilizar botões
-        style.configure('Neon.TButton',
-                       font=('Segoe UI', 10, 'bold'),
-                       foreground=self.cores['texto_claro'],
-                       background=self.cores['neon_rosa'],
-                       padding=10)
         
         # Configurar fundo da janela
         self.root.configure(bg=self.cores['bg'])
@@ -48,33 +39,99 @@ class PrevisaoTempoApp:
         
         # Configurar grid
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(1, weight=1)
+        main_frame.rowconfigure(6, weight=1)
         
-        # Título com efeito neon
+        # Título
         titulo_frame = tk.Frame(main_frame, bg=self.cores['bg'])
-        titulo_frame.grid(row=0, column=0, pady=(0, 15))
+        titulo_frame.grid(row=0, column=0, pady=(0, 10))
         
         titulo = tk.Label(titulo_frame, 
-                         text="🌤️ PREVISÃO DO TEMPO - CARAMBEÍ 🌤️",
-                         font=('Segoe UI', 18, 'bold'),
+                         text="🌤️ PREVISÃO DO TEMPO NEON 🌤️",
+                         font=('Segoe UI', 20, 'bold'),
                          fg=self.cores['neon_azul'],
                          bg=self.cores['bg'])
         titulo.pack()
         
-        # Subtítulo com efeito neon
         subtitulo = tk.Label(titulo_frame,
-                            text="✦ Clima em tempo real ✦",
+                            text="✦ Dados precisos da Open-Meteo API ✦",
                             font=('Segoe UI', 11, 'italic'),
                             fg=self.cores['neon_roxo'],
                             bg=self.cores['bg'])
         subtitulo.pack()
         
-        # Frame para botões com borda neon
+        # Frame de busca
+        search_frame = tk.Frame(main_frame, bg=self.cores['bg_frame'], 
+                               relief=tk.RAISED, bd=2)
+        search_frame.grid(row=1, column=0, pady=10, sticky=(tk.W, tk.E))
+        
+        # Label da cidade
+        label_cidade = tk.Label(search_frame,
+                               text="🌆 Cidade:",
+                               font=('Segoe UI', 11, 'bold'),
+                               fg=self.cores['neon_verde'],
+                               bg=self.cores['bg_frame'])
+        label_cidade.pack(side=tk.LEFT, padx=10, pady=10)
+        
+        # Entry para digitar a cidade
+        self.cidade_var = tk.StringVar()
+        self.cidade_var.set("Carambeí")
+        self.entry_cidade = tk.Entry(search_frame,
+                                     textvariable=self.cidade_var,
+                                     font=('Segoe UI', 11),
+                                     width=25,
+                                     bg=self.cores['bg'],
+                                     fg=self.cores['texto_claro'],
+                                     insertbackground=self.cores['neon_verde'],
+                                     relief=tk.FLAT)
+        self.entry_cidade.pack(side=tk.LEFT, padx=5, pady=10)
+        self.entry_cidade.bind('<Return>', lambda e: self.buscar_cidade())
+        
+        # Botão de buscar
+        self.btn_buscar = tk.Button(search_frame,
+                                   text="🔍 Buscar Clima",
+                                   font=('Segoe UI', 10, 'bold'),
+                                   fg=self.cores['bg'],
+                                   bg=self.cores['neon_azul'],
+                                   activebackground=self.cores['neon_verde'],
+                                   activeforeground=self.cores['bg'],
+                                   relief=tk.FLAT,
+                                   padx=15,
+                                   pady=8,
+                                   cursor='hand2',
+                                   command=self.buscar_cidade)
+        self.btn_buscar.pack(side=tk.LEFT, padx=5, pady=10)
+        
+        # Sugestões rápidas
+        sugestoes_frame = tk.Frame(search_frame, bg=self.cores['bg_frame'])
+        sugestoes_frame.pack(side=tk.RIGHT, padx=10, pady=5)
+        
+        tk.Label(sugestoes_frame,
+                text="Sugestões:",
+                font=('Segoe UI', 9),
+                fg=self.cores['neon_amarelo'],
+                bg=self.cores['bg_frame']).pack(side=tk.LEFT, padx=5)
+        
+        cidades_sugeridas = ["Carambeí", "Curitiba", "São Paulo", "Rio de Janeiro", "Brasília", "Porto Alegre"]
+        for cidade in cidades_sugeridas:
+            btn_sug = tk.Button(sugestoes_frame,
+                               text=cidade,
+                               font=('Segoe UI', 8),
+                               fg=self.cores['bg'],
+                               bg=self.cores['neon_roxo'],
+                               activebackground=self.cores['neon_azul'],
+                               activeforeground=self.cores['bg'],
+                               relief=tk.FLAT,
+                               padx=8,
+                               pady=3,
+                               cursor='hand2',
+                               command=lambda c=cidade: self.set_cidade(c))
+            btn_sug.pack(side=tk.LEFT, padx=3)
+        
+        # Frame para botões principais
         button_frame = tk.Frame(main_frame, bg=self.cores['bg_frame'], 
                                relief=tk.RAISED, bd=2)
-        button_frame.grid(row=1, column=0, pady=10, sticky=(tk.W, tk.E))
+        button_frame.grid(row=2, column=0, pady=10, sticky=(tk.W, tk.E))
         
-        # Botões estilizados
         self.btn_atualizar = tk.Button(button_frame, 
                                       text="🔄 Atualizar Clima",
                                       font=('Segoe UI', 10, 'bold'),
@@ -103,12 +160,26 @@ class PrevisaoTempoApp:
                                      command=self.mostrar_detalhes)
         self.btn_detalhes.pack(side=tk.LEFT, padx=5, pady=5)
         
+        self.btn_previsao = tk.Button(button_frame,
+                                     text="📅 Previsão 7 Dias",
+                                     font=('Segoe UI', 10, 'bold'),
+                                     fg=self.cores['bg'],
+                                     bg=self.cores['neon_laranja'],
+                                     activebackground=self.cores['neon_rosa'],
+                                     activeforeground=self.cores['bg'],
+                                     relief=tk.FLAT,
+                                     padx=15,
+                                     pady=8,
+                                     cursor='hand2',
+                                     command=self.mostrar_previsao_semana)
+        self.btn_previsao.pack(side=tk.LEFT, padx=5, pady=5)
+        
         self.btn_limpar = tk.Button(button_frame,
                                    text="🗑️ Limpar",
                                    font=('Segoe UI', 10, 'bold'),
                                    fg=self.cores['bg'],
-                                   bg=self.cores['neon_laranja'],
-                                   activebackground=self.cores['neon_rosa'],
+                                   bg=self.cores['neon_rosa'],
+                                   activebackground=self.cores['neon_laranja'],
                                    activeforeground=self.cores['bg'],
                                    relief=tk.FLAT,
                                    padx=15,
@@ -117,9 +188,9 @@ class PrevisaoTempoApp:
                                    command=self.limpar_texto)
         self.btn_limpar.pack(side=tk.LEFT, padx=5, pady=5)
         
-        # Status bar neon
+        # Status bar
         status_frame = tk.Frame(main_frame, bg=self.cores['bg_frame'])
-        status_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
+        status_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
         
         self.status_var = tk.StringVar()
         self.status_var.set("✨ Pronto para consultar ✨")
@@ -133,15 +204,15 @@ class PrevisaoTempoApp:
                                    pady=5)
         self.status_bar.pack(fill=tk.X)
         
-        # Área de texto com tema neon
+        # Área de texto
         text_frame = tk.Frame(main_frame, bg=self.cores['bg_frame'], 
                             relief=tk.RAISED, bd=2)
-        text_frame.grid(row=3, column=0, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        text_frame.grid(row=4, column=0, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         self.text_area = scrolledtext.ScrolledText(text_frame,
                                                   wrap=tk.WORD,
                                                   width=80,
-                                                  height=25,
+                                                  height=22,
                                                   font=('Consolas', 10),
                                                   bg=self.cores['bg'],
                                                   fg=self.cores['texto_claro'],
@@ -151,9 +222,9 @@ class PrevisaoTempoApp:
                                                   pady=10)
         self.text_area.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Configurar tags para formatação neon
+        # Configurar tags
         self.text_area.tag_configure('titulo', 
-                                    font=('Segoe UI', 13, 'bold'),
+                                    font=('Segoe UI', 14, 'bold'),
                                     foreground=self.cores['neon_azul'])
         self.text_area.tag_configure('subtitulo',
                                     font=('Segoe UI', 12, 'bold'),
@@ -166,132 +237,268 @@ class PrevisaoTempoApp:
         self.text_area.tag_configure('separador',
                                     foreground=self.cores['neon_amarelo'])
         self.text_area.tag_configure('erro',
-                                    foreground='#ff4757',
+                                    foreground=self.cores['neon_vermelho'],
                                     font=('Segoe UI', 10, 'bold'))
         self.text_area.tag_configure('neon_laranja',
                                     foreground=self.cores['neon_laranja'])
         
         # Carregar dados iniciais
-        self.atualizar_clima()
+        self.root.after(100, self.atualizar_clima)
+    
+    def geocodificar(self, cidade):
+        """Converte nome da cidade em coordenadas usando Open-Meteo Geocoding"""
+        try:
+            url = f"https://geocoding-api.open-meteo.com/v1/search?name={cidade}&count=1&language=pt&format=json"
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                dados = response.json()
+                if dados.get('results'):
+                    resultado = dados['results'][0]
+                    return {
+                        'nome': resultado['name'],
+                        'pais': resultado.get('country', 'N/A'),
+                        'latitude': resultado['latitude'],
+                        'longitude': resultado['longitude'],
+                        'regiao': resultado.get('admin1', 'N/A')
+                    }
+            return None
+        except Exception as e:
+            return None
+    
+    def buscar_dados_clima(self, lat, lon):
+        """Busca dados climáticos da Open-Meteo API"""
+        try:
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,cloud_cover&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=America/Sao_Paulo&forecast_days=7"
+            
+            response = requests.get(url, timeout=15)
+            
+            if response.status_code == 200:
+                return response.json()
+            return None
+        except Exception as e:
+            return None
+    
+    def traduzir_clima(self, weather_code):
+        """Traduz o código WMO para texto em português"""
+        codigos = {
+            0: "☀️ Céu limpo",
+            1: "🌤️ Principalmente limpo",
+            2: "⛅ Parcialmente nublado",
+            3: "☁️ Encoberto",
+            45: "🌫️ Nevoeiro",
+            48: "🌫️ Nevoeiro gelado",
+            51: "🌧️ Chuvisco leve",
+            53: "🌧️ Chuvisco moderado",
+            55: "🌧️ Chuvisco forte",
+            61: "🌧️ Chuva leve",
+            63: "🌧️ Chuva moderada",
+            65: "🌧️ Chuva forte",
+            71: "❄️ Neve leve",
+            73: "❄️ Neve moderada",
+            75: "❄️ Neve forte",
+            80: "🌧️ Aguaceiros leves",
+            81: "🌧️ Aguaceiros moderados",
+            82: "🌧️ Aguaceiros fortes",
+            95: "⛈️ Trovoada",
+            96: "⛈️ Trovoada com granizo",
+            99: "⛈️ Trovoada forte com granizo"
+        }
+        return codigos.get(weather_code, f"Código {weather_code}")
+    
+    def buscar_cidade(self):
+        """Busca o clima para a cidade digitada"""
+        cidade = self.cidade_var.get().strip()
+        if cidade:
+            self.status_var.set(f"🌟 Buscando clima para {cidade}... 🌟")
+            self.root.update()
+            self.atualizar_clima()
+        else:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "⚠️ Por favor, digite o nome de uma cidade!\n", 'erro')
+            self.status_var.set("⚠️ Digite o nome da cidade")
+    
+    def set_cidade(self, cidade):
+        """Define a cidade e busca automaticamente"""
+        self.cidade_var.set(cidade)
+        self.buscar_cidade()
     
     def atualizar_clima(self):
         """Atualiza a previsão do tempo resumida"""
         self.text_area.delete(1.0, tk.END)
-        self.status_var.set("🌟 Consultando clima... 🌟")
+        cidade = self.cidade_var.get().strip()
+        
+        if not cidade:
+            self.text_area.insert(tk.END, "⚠️ Digite o nome de uma cidade!\n", 'erro')
+            self.status_var.set("⚠️ Digite o nome da cidade")
+            return
+        
+        self.status_var.set(f"🌟 Buscando {cidade}... 🌟")
         self.root.update()
         
-        try:
-            url_resumo = "https://wttr.in/Carambei?format=3&lang=pt"
-            response = requests.get(url_resumo, timeout=10)
-            response.encoding = 'utf-8'
-            
-            if response.status_code == 200:
-                resumo = response.text.strip()
-                
-                # Cabeçalho com neon
-                self.text_area.insert(tk.END, "✦" * 30 + "\n", 'separador')
-                self.text_area.insert(tk.END, "  🌸 CLIMA ATUAL - CARAMBEÍ 🌸\n", 'titulo')
-                self.text_area.insert(tk.END, "✦" * 30 + "\n\n", 'separador')
-                self.text_area.insert(tk.END, f"  {resumo}\n\n", 'destaque')
-                self.text_area.insert(tk.END, "✦" * 30 + "\n", 'separador')
-                self.text_area.insert(tk.END, "  💫 Para detalhes completos, clique em\n", 'info')
-                self.text_area.insert(tk.END, "  '📊 Detalhes Completos'\n", 'neon_laranja')
-                self.text_area.insert(tk.END, "✦" * 30 + "\n", 'separador')
-                
-                self.status_var.set(f"✨ Atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} ✨")
-            else:
-                self.text_area.insert(tk.END, "❌ Erro ao consultar o clima.\n", 'erro')
-                self.status_var.set("❌ Erro na consulta")
-                
-        except requests.exceptions.RequestException as e:
-            self.text_area.insert(tk.END, f"⚠️ Erro de conexão: {str(e)}\n", 'erro')
-            self.text_area.insert(tk.END, "🔌 Verifique sua conexão com a internet.\n", 'erro')
-            self.status_var.set("⚠️ Erro de conexão")
-        except Exception as e:
-            self.text_area.insert(tk.END, f"💥 Erro inesperado: {str(e)}\n", 'erro')
-            self.status_var.set("💥 Erro inesperado")
+        # Geocodificar
+        localizacao = self.geocodificar(cidade)
+        if not localizacao:
+            self.text_area.insert(tk.END, f"❌ Cidade '{cidade}' não encontrada!\n", 'erro')
+            self.text_area.insert(tk.END, "Verifique o nome e tente novamente.\n", 'info')
+            self.status_var.set("❌ Cidade não encontrada")
+            return
+        
+        # Buscar clima
+        dados_clima = self.buscar_dados_clima(localizacao['latitude'], localizacao['longitude'])
+        if not dados_clima:
+            self.text_area.insert(tk.END, "❌ Erro ao buscar dados climáticos!\n", 'erro')
+            self.status_var.set("❌ Erro ao buscar dados")
+            return
+        
+        # Extrair dados atuais
+        current = dados_clima.get('current', {})
+        temp = current.get('temperature_2m', 'N/A')
+        sensacao = current.get('apparent_temperature', 'N/A')
+        umidade = current.get('relative_humidity_2m', 'N/A')
+        vento = current.get('wind_speed_10m', 'N/A')
+        precip = current.get('precipitation', 'N/A')
+        weather_code = current.get('weather_code', 0)
+        condicao = self.traduzir_clima(weather_code)
+        
+        # Mostrar resultado
+        self.text_area.insert(tk.END, "✦" * 35 + "\n", 'separador')
+        self.text_area.insert(tk.END, f"  🌸 {localizacao['nome'].upper()} - {localizacao['pais']} 🌸\n", 'titulo')
+        self.text_area.insert(tk.END, "✦" * 35 + "\n\n", 'separador')
+        
+        self.text_area.insert(tk.END, f"  {condicao}\n\n", 'destaque')
+        self.text_area.insert(tk.END, f"  🌡️  Temperatura: {temp}°C\n", 'neon_laranja')
+        self.text_area.insert(tk.END, f"  🌡️  Sensação: {sensacao}°C\n", 'info')
+        self.text_area.insert(tk.END, f"  💧  Umidade: {umidade}%\n", 'info')
+        self.text_area.insert(tk.END, f"  💨  Vento: {vento} km/h\n", 'info')
+        self.text_area.insert(tk.END, f"  🌧️  Precipitação: {precip} mm\n\n", 'info')
+        
+        self.text_area.insert(tk.END, "✦" * 35 + "\n", 'separador')
+        self.text_area.insert(tk.END, "  💫 Para mais detalhes:\n", 'info')
+        self.text_area.insert(tk.END, "  📊 'Detalhes Completos'\n", 'neon_laranja')
+        self.text_area.insert(tk.END, "  📅 'Previsão 7 Dias'\n", 'neon_laranja')
+        self.text_area.insert(tk.END, "✦" * 35 + "\n", 'separador')
+        
+        self.status_var.set(f"✨ {localizacao['nome']} atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} ✨")
     
     def mostrar_detalhes(self):
-        """Mostra os detalhes completos da previsão"""
-        self.status_var.set("🌟 Carregando detalhes completos... 🌟")
+        """Mostra os detalhes completos"""
+        cidade = self.cidade_var.get().strip()
+        
+        if not cidade:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "⚠️ Digite o nome de uma cidade!\n", 'erro')
+            self.status_var.set("⚠️ Digite o nome da cidade")
+            return
+        
+        self.status_var.set(f"🌟 Carregando detalhes para {cidade}... 🌟")
         self.root.update()
         
-        try:
-            url_json = "https://wttr.in/Carambei?format=j1&lang=pt"
-            response = requests.get(url_json, timeout=15)
-            
-            if response.status_code == 200:
-                dados = response.json()
-                self.text_area.delete(1.0, tk.END)
-                self.mostrar_detalhes_estruturados(dados)
-                self.status_var.set(f"✨ Detalhes atualizados: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} ✨")
-            else:
-                # Fallback para formato texto
-                self.text_area.delete(1.0, tk.END)
-                url_texto = "https://wttr.in/Carambei?lang=pt"
-                response = requests.get(url_texto, timeout=10)
-                response.encoding = 'utf-8'
-                self.text_area.insert(tk.END, response.text, 'info')
-                self.status_var.set("✨ Detalhes carregados (modo texto) ✨")
-                
-        except requests.exceptions.RequestException as e:
-            self.text_area.insert(tk.END, f"⚠️ Erro de conexão: {str(e)}\n", 'erro')
-            self.status_var.set("⚠️ Erro de conexão")
-        except Exception as e:
-            self.text_area.insert(tk.END, f"💥 Erro inesperado: {str(e)}\n", 'erro')
-            self.status_var.set("💥 Erro inesperado")
+        localizacao = self.geocodificar(cidade)
+        if not localizacao:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, f"❌ Cidade '{cidade}' não encontrada!\n", 'erro')
+            self.status_var.set("❌ Cidade não encontrada")
+            return
+        
+        dados_clima = self.buscar_dados_clima(localizacao['latitude'], localizacao['longitude'])
+        if not dados_clima:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "❌ Erro ao buscar dados climáticos!\n", 'erro')
+            self.status_var.set("❌ Erro ao buscar dados")
+            return
+        
+        self.text_area.delete(1.0, tk.END)
+        
+        # Cabeçalho
+        self.text_area.insert(tk.END, "✦" * 45 + "\n", 'separador')
+        self.text_area.insert(tk.END, f"  🌸 DETALHES - {localizacao['nome'].upper()} 🌸\n", 'titulo')
+        self.text_area.insert(tk.END, "✦" * 45 + "\n\n", 'separador')
+        
+        # Localização
+        self.text_area.insert(tk.END, "📍 LOCALIZAÇÃO\n", 'subtitulo')
+        self.text_area.insert(tk.END, f"  Cidade: {localizacao['nome']}\n", 'info')
+        self.text_area.insert(tk.END, f"  Região: {localizacao['regiao']}\n", 'info')
+        self.text_area.insert(tk.END, f"  País: {localizacao['pais']}\n", 'info')
+        self.text_area.insert(tk.END, f"  Coordenadas: {localizacao['latitude']}, {localizacao['longitude']}\n\n", 'info')
+        
+        # Dados atuais
+        current = dados_clima.get('current', {})
+        self.text_area.insert(tk.END, "🌡️ CONDIÇÕES ATUAIS\n", 'subtitulo')
+        
+        weather_code = current.get('weather_code', 0)
+        condicao = self.traduzir_clima(weather_code)
+        self.text_area.insert(tk.END, f"  {condicao}\n", 'destaque')
+        self.text_area.insert(tk.END, f"  🌡️  Temperatura: {current.get('temperature_2m', 'N/A')}°C\n", 'neon_laranja')
+        self.text_area.insert(tk.END, f"  🌡️  Sensação térmica: {current.get('apparent_temperature', 'N/A')}°C\n", 'info')
+        self.text_area.insert(tk.END, f"  💧  Umidade: {current.get('relative_humidity_2m', 'N/A')}%\n", 'info')
+        self.text_area.insert(tk.END, f"  💨  Vento: {current.get('wind_speed_10m', 'N/A')} km/h\n", 'info')
+        self.text_area.insert(tk.END, f"  🧭  Direção do vento: {current.get('wind_direction_10m', 'N/A')}°\n", 'info')
+        self.text_area.insert(tk.END, f"  🌧️  Precipitação: {current.get('precipitation', 'N/A')} mm\n", 'info')
+        self.text_area.insert(tk.END, f"  📊  Pressão: {current.get('pressure_msl', 'N/A')} hPa\n", 'info')
+        self.text_area.insert(tk.END, f"  ☁️  Nebulosidade: {current.get('cloud_cover', 'N/A')}%\n\n", 'info')
+        
+        self.text_area.insert(tk.END, "✦" * 45 + "\n", 'separador')
+        self.text_area.insert(tk.END, "💫 Dados fornecidos por Open-Meteo\n", 'info')
+        self.status_var.set(f"✨ Detalhes de {localizacao['nome']} atualizados ✨")
     
-    def mostrar_detalhes_estruturados(self, dados):
-        """Mostra os detalhes em formato estruturado com estilo neon"""
-        try:
-            atual = dados.get('current_condition', [{}])[0]
-            local = dados.get('nearest_area', [{}])[0]
+    def mostrar_previsao_semana(self):
+        """Mostra a previsão para 7 dias"""
+        cidade = self.cidade_var.get().strip()
+        
+        if not cidade:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "⚠️ Digite o nome de uma cidade!\n", 'erro')
+            self.status_var.set("⚠️ Digite o nome da cidade")
+            return
+        
+        self.status_var.set(f"🌟 Carregando previsão para {cidade}... 🌟")
+        self.root.update()
+        
+        localizacao = self.geocodificar(cidade)
+        if not localizacao:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, f"❌ Cidade '{cidade}' não encontrada!\n", 'erro')
+            self.status_var.set("❌ Cidade não encontrada")
+            return
+        
+        dados_clima = self.buscar_dados_clima(localizacao['latitude'], localizacao['longitude'])
+        if not dados_clima:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "❌ Erro ao buscar dados climáticos!\n", 'erro')
+            self.status_var.set("❌ Erro ao buscar dados")
+            return
+        
+        self.text_area.delete(1.0, tk.END)
+        
+        # Cabeçalho
+        self.text_area.insert(tk.END, "✦" * 50 + "\n", 'separador')
+        self.text_area.insert(tk.END, f"  📅 PREVISÃO 7 DIAS - {localizacao['nome'].upper()} 📅\n", 'titulo')
+        self.text_area.insert(tk.END, "✦" * 50 + "\n\n", 'separador')
+        
+        daily = dados_clima.get('daily', {})
+        datas = daily.get('time', [])
+        temp_max = daily.get('temperature_2m_max', [])
+        temp_min = daily.get('temperature_2m_min', [])
+        precip = daily.get('precipitation_sum', [])
+        weather_codes = daily.get('weather_code', [])
+        
+        for i in range(min(7, len(datas))):
+            data_obj = datetime.strptime(datas[i], '%Y-%m-%d')
+            nome_dia = data_obj.strftime('%A').upper()
+            data_formatada = data_obj.strftime('%d/%m')
             
-            # Cabeçalho neon
-            self.text_area.insert(tk.END, "✦" * 40 + "\n", 'separador')
-            self.text_area.insert(tk.END, "  🌸 DETALHES COMPLETOS - CARAMBEÍ 🌸\n", 'titulo')
-            self.text_area.insert(tk.END, "✦" * 40 + "\n\n", 'separador')
+            condicao = self.traduzir_clima(weather_codes[i] if i < len(weather_codes) else 0)
             
-            # Localização
-            self.text_area.insert(tk.END, "📍 LOCALIZAÇÃO\n", 'subtitulo')
-            self.text_area.insert(tk.END, f"  Cidade: {local.get('areaName', [{}])[0].get('value', 'N/A')}\n", 'info')
-            self.text_area.insert(tk.END, f"  Região: {local.get('region', [{}])[0].get('value', 'N/A')}\n", 'info')
-            self.text_area.insert(tk.END, f"  País: {local.get('country', [{}])[0].get('value', 'N/A')}\n\n", 'info')
-            
-            # Condições atuais
-            self.text_area.insert(tk.END, "🌡️ CONDIÇÕES ATUAIS\n", 'subtitulo')
-            self.text_area.insert(tk.END, f"  🌡️  Temperatura: {atual.get('temp_C', 'N/A')}°C\n", 'destaque')
-            self.text_area.insert(tk.END, f"  🌡️  Sensação: {atual.get('FeelsLikeC', 'N/A')}°C\n", 'info')
-            self.text_area.insert(tk.END, f"  ☁️  Condição: {atual.get('weatherDesc', [{}])[0].get('value', 'N/A')}\n", 'info')
-            self.text_area.insert(tk.END, f"  💧  Umidade: {atual.get('humidity', 'N/A')}%\n", 'neon_laranja')
-            self.text_area.insert(tk.END, f"  💨  Vento: {atual.get('windspeedKmph', 'N/A')} km/h\n", 'info')
-            self.text_area.insert(tk.END, f"  🧭  Direção: {atual.get('winddir16Point', 'N/A')}\n", 'info')
-            self.text_area.insert(tk.END, f"  📊  Pressão: {atual.get('pressure', 'N/A')} mb\n", 'info')
-            self.text_area.insert(tk.END, f"  👁️  Visibilidade: {atual.get('visibility', 'N/A')} km\n", 'info')
-            self.text_area.insert(tk.END, f"  ☀️  UV Index: {atual.get('uvIndex', 'N/A')}\n", 'neon_roxo')
-            self.text_area.insert(tk.END, f"  ☁️  Nuvens: {atual.get('cloudcover', 'N/A')}%\n\n", 'info')
-            
-            # Previsão
-            previsao = dados.get('weather', [])
-            if previsao:
-                self.text_area.insert(tk.END, "📅 PREVISÃO PARA OS PRÓXIMOS DIAS\n", 'subtitulo')
-                self.text_area.insert(tk.END, "─" * 40 + "\n", 'separador')
-                
-                for dia in previsao[:3]:
-                    data = dia.get('date', 'N/A')
-                    max_temp = dia.get('maxtempC', 'N/A')
-                    min_temp = dia.get('mintempC', 'N/A')
-                    condicao = dia.get('hourly', [{}])[0].get('weatherDesc', [{}])[0].get('value', 'N/A')
-                    
-                    self.text_area.insert(tk.END, f"  📆 {data}\n", 'destaque')
-                    self.text_area.insert(tk.END, f"     {condicao}\n", 'info')
-                    self.text_area.insert(tk.END, f"     🔥 Máx: {max_temp}°C  ❄️ Mín: {min_temp}°C\n\n", 'neon_laranja')
-            
-            self.text_area.insert(tk.END, "✦" * 40 + "\n", 'separador')
-            self.text_area.insert(tk.END, "💫 Dados fornecidos por wttr.in\n", 'info')
-            
-        except Exception as e:
-            self.text_area.insert(tk.END, f"💥 Erro ao processar dados: {str(e)}\n", 'erro')
+            self.text_area.insert(tk.END, f"  📆 {nome_dia} - {data_formatada}\n", 'destaque')
+            self.text_area.insert(tk.END, f"     {condicao}\n", 'info')
+            self.text_area.insert(tk.END, f"     🔥 Máx: {temp_max[i] if i < len(temp_max) else 'N/A'}°C", 'neon_laranja')
+            self.text_area.insert(tk.END, f"  ❄️ Mín: {temp_min[i] if i < len(temp_min) else 'N/A'}°C\n", 'neon_laranja')
+            self.text_area.insert(tk.END, f"     🌧️  Precipitação: {precip[i] if i < len(precip) else 'N/A'} mm\n\n", 'info')
+        
+        self.text_area.insert(tk.END, "✦" * 50 + "\n", 'separador')
+        self.text_area.insert(tk.END, "💫 Dados fornecidos por Open-Meteo\n", 'info')
+        self.status_var.set(f"✨ Previsão de {localizacao['nome']} atualizada ✨")
     
     def limpar_texto(self):
         """Limpa a área de texto"""
