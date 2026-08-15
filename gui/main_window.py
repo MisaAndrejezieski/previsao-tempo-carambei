@@ -7,7 +7,6 @@ from core.clima_service import ClimaService
 from core.exceptions import ClimaException
 from core.models import PrevisaoCompleta
 from gui.styles import NeonTheme
-from gui.widgets.charts_panel import ChartsPanel
 from gui.widgets.search_panel import SearchPanel
 from gui.widgets.weather_display import WeatherDisplay
 from utils.logger import log
@@ -61,22 +60,22 @@ class MainWindow:
         # Notebook para abas
         self.notebook = ttk.Notebook(self.right_frame)
         self.notebook.pack(fill=tk.BOTH, expand=True)
-        
-        # Aba de clima
+
         self.weather_display = WeatherDisplay(
             self.notebook,
             theme=theme,
-            clima_service=self.clima_service
+            clima_service=self.clima_service,
+            mode="current"
         )
-        self.notebook.add(self.weather_display, text="📝 Clima")
-        
-        # Aba de gráficos
-        self.charts_panel = ChartsPanel(
+        self.notebook.add(self.weather_display, text="🌤️ Hoje")
+
+        self.forecast_display = WeatherDisplay(
             self.notebook,
             theme=theme,
-            clima_service=self.clima_service
+            clima_service=self.clima_service,
+            mode="forecast"
         )
-        self.notebook.add(self.charts_panel, text="📈 Gráficos")
+        self.notebook.add(self.forecast_display, text="📅 7 dias")
         
         # Status bar
         self.status_bar = tk.Label(
@@ -139,10 +138,8 @@ class MainWindow:
     def _setup_bindings(self):
         """Configura atalhos de teclado"""
         self.root.bind('<Control-r>', lambda e: self.carregar_cidade(self.search_panel.get_cidade()))
-        self.root.bind('<Control-d>', lambda e: self.weather_display.mostrar_detalhes())
-        self.root.bind('<Control-p>', lambda e: self.weather_display.mostrar_previsao())
-        self.root.bind('<Control-g>', lambda e: self.notebook.select(1))
-        self.root.bind('<Control-m>', lambda e: self.charts_panel.mostrar_mapa())
+        self.root.bind('<Control-1>', lambda e: self.notebook.select(0))
+        self.root.bind('<Control-2>', lambda e: self.notebook.select(1))
     
     def carregar_cidade(self, cidade: str):
         """Carrega dados de uma cidade (em thread separada)"""
@@ -182,8 +179,7 @@ class MainWindow:
         if previsao:
             self.previsao_atual = previsao
             self.weather_display.atualizar(previsao)
-            self.charts_panel.atualizar(previsao)
-            self.search_panel.adicionar_historico(previsao.atual.coordenadas.cidade)
+            self.forecast_display.atualizar(previsao)
             self._atualizar_status(f"✨ {previsao.atual.coordenadas.cidade} atualizado!")
         else:
             self._mostrar_erro("Erro ao buscar dados")

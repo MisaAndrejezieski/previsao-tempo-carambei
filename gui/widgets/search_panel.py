@@ -1,10 +1,8 @@
 """Widget de busca de cidades"""
 
-import os
-import pickle
 import tkinter as tk
 from tkinter import ttk
-from typing import Callable, Optional
+from typing import Callable
 
 from gui.styles import NeonTheme
 
@@ -16,10 +14,8 @@ class SearchPanel(tk.Frame):
         super().__init__(parent, bg=theme.bg)
         self.theme = theme
         self.on_search = on_search
-        self.historico = []
-        
+
         self._criar_widgets()
-        self._carregar_historico()
     
     def _criar_widgets(self):
         """Cria os widgets do painel"""
@@ -95,27 +91,6 @@ class SearchPanel(tk.Frame):
             )
             btn.pack(side=tk.LEFT, padx=2, pady=2)
         
-        # Histórico
-        tk.Label(
-            self,
-            text="📜 Histórico",
-            font=('Segoe UI', 10, 'bold'),
-            fg=self.theme.neon_amarelo,
-            bg=self.theme.bg
-        ).pack(pady=(10, 5))
-        
-        self.historico_listbox = tk.Listbox(
-            self,
-            height=5,
-            bg=self.theme.bg_frame,
-            fg=self.theme.texto_claro,
-            selectbackground=self.theme.neon_azul,
-            relief=tk.FLAT,
-            font=('Segoe UI', 9)
-        )
-        self.historico_listbox.pack(fill=tk.X, pady=5)
-        self.historico_listbox.bind('<Double-Button-1>', self._carregar_do_historico)
-        
         # Barra de progresso
         self.progress = ttk.Progressbar(
             self,
@@ -140,13 +115,6 @@ class SearchPanel(tk.Frame):
         self.cidade_var.set(cidade)
         self.buscar()
     
-    def adicionar_historico(self, cidade: str):
-        """Adiciona cidade ao histórico"""
-        if cidade not in self.historico:
-            self.historico.append(cidade)
-            self._salvar_historico()
-            self._atualizar_historico()
-    
     def mostrar_carregando(self, ativo: bool):
         """Mostra/oculta barra de progresso"""
         if ativo:
@@ -157,37 +125,3 @@ class SearchPanel(tk.Frame):
             self.progress.stop()
             self.progress.pack_forget()
             self.btn_buscar.config(state=tk.NORMAL)
-    
-    def _carregar_do_historico(self, event):
-        """Carrega cidade do histórico"""
-        try:
-            index = self.historico_listbox.curselection()[0]
-            cidade = self.historico_listbox.get(index)
-            self.cidade_var.set(cidade)
-            self.buscar()
-        except:
-            pass
-    
-    def _atualizar_historico(self):
-        """Atualiza listbox do histórico"""
-        self.historico_listbox.delete(0, tk.END)
-        for cidade in reversed(self.historico[-10:]):
-            self.historico_listbox.insert(tk.END, cidade)
-    
-    def _carregar_historico(self):
-        """Carrega histórico do disco"""
-        try:
-            if os.path.exists('historico.pkl'):
-                with open('historico.pkl', 'rb') as f:
-                    self.historico = pickle.load(f)
-                self._atualizar_historico()
-        except:
-            pass
-    
-    def _salvar_historico(self):
-        """Salva histórico no disco"""
-        try:
-            with open('historico.pkl', 'wb') as f:
-                pickle.dump(self.historico[-20:], f)
-        except:
-            pass

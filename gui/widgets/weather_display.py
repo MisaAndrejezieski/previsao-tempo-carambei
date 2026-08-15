@@ -11,14 +11,15 @@ from utils.logger import log
 
 
 class WeatherDisplay(tk.Frame):
-    """Exibe informações do clima"""
-    
-    def __init__(self, parent, theme: NeonTheme, clima_service):
+    """Exibe informações do clima e a previsão em aba separada."""
+
+    def __init__(self, parent, theme: NeonTheme, clima_service, mode: str = "current"):
         super().__init__(parent, bg=theme.bg)
         self.theme = theme
         self.clima_service = clima_service
         self.previsao: Optional[PrevisaoCompleta] = None
-        
+        self.mode = mode
+
         self._criar_widgets()
         self._configurar_tags()
     
@@ -57,21 +58,30 @@ class WeatherDisplay(tk.Frame):
                 self.text_area.tag_configure(nome, font=(fonte, tamanho, resto[0]), foreground=resto[1])
     
     def atualizar(self, previsao: PrevisaoCompleta):
-        """Atualiza com novos dados - MOSTRA A PREVISÃO COMPLETA!"""
+        """Atualiza a área com clima atual ou previsão diária, conforme a aba."""
         self.previsao = previsao
         self.text_area.delete(1.0, tk.END)
-        
+
         atual = previsao.atual
         coords = atual.coordenadas
-        
-        # ============ CABEÇALHO ============
+
         self.text_area.insert(tk.END, "✦" * 45 + "\n", 'separador')
         self.text_area.insert(tk.END, f"  🌸 {coords.cidade.upper()} - {coords.pais} 🌸\n", 'titulo')
         if coords.regiao:
             self.text_area.insert(tk.END, f"  📍 {coords.regiao}\n", 'info')
         self.text_area.insert(tk.END, "✦" * 45 + "\n\n", 'separador')
-        
-        # ============ CLIMA ATUAL ============
+
+        if self.mode == 'current':
+            self._mostrar_clima_atual(atual)
+        else:
+            self._mostrar_previsao_7dias(previsao)
+
+        self.text_area.insert(tk.END, f"\n🕐 Atualizado: {atual.atualizado_em.strftime('%d/%m/%Y %H:%M')}\n", 'info')
+        self.text_area.insert(tk.END, "✦" * 45 + "\n", 'separador')
+        self.text_area.insert(tk.END, "💫 Dados fornecidos por Open-Meteo\n", 'info')
+
+    def _mostrar_clima_atual(self, atual):
+        """Exibe apenas o clima atual."""
         condicao = atual.condicao
         self.text_area.insert(tk.END, "🌡️ CLIMA ATUAL\n", 'subtitulo')
         self.text_area.insert(tk.END, f"  {condicao.icone} {condicao.descricao}\n\n", 'destaque')
@@ -80,45 +90,51 @@ class WeatherDisplay(tk.Frame):
         self.text_area.insert(tk.END, f"  💧  Umidade: {atual.umidade}%\n", 'info')
         self.text_area.insert(tk.END, f"  💨  Vento: {atual.vento_kmh} km/h\n", 'info')
         self.text_area.insert(tk.END, f"  🌧️  Precipitação: {atual.precipitacao} mm\n", 'info')
-        self.text_area.insert(tk.END, f"  ☁️  Nuvens: {atual.nuvens}%\n\n", 'info')
-        
-        # ============ PREVISÃO 7 DIAS ============
-        if previsao.previsao_7dias:
-            self.text_area.insert(tk.END, "📅 PREVISÃO 7 DIAS\n", 'subtitulo')
-            self.text_area.insert(tk.END, "─" * 45 + "\n", 'separador')
-            
-            dias_semana = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO']
-            
-            for i, dia in enumerate(previsao.previsao_7dias[:7]):
-                nome_dia = dias_semana[dia.data.weekday()]
-                data_formatada = dia.data.strftime('%d/%m')
-                
-                # Dia
-                self.text_area.insert(tk.END, f"\n  📆 {nome_dia} - {data_formatada}\n", 'destaque')
-                
-                # Condição
-                self.text_area.insert(tk.END, f"     {dia.condicao.icone} {dia.condicao.descricao}\n", 'info')
-                
-                # Temperaturas
-                self.text_area.insert(tk.END, f"     🔥 Máx: {dia.temp_max}°C", 'neon_laranja')
-                self.text_area.insert(tk.END, f"  ❄️ Mín: {dia.temp_min}°C\n", 'neon_laranja')
-                
-                # Precipitação
-                if dia.precipitacao > 0:
-                    self.text_area.insert(tk.END, f"     🌧️  Precipitação: {dia.precipitacao} mm\n", 'info')
-                else:
-                    self.text_area.insert(tk.END, f"     ☀️  Sem chuva prevista\n", 'info')
-            
-            self.text_area.insert(tk.END, "\n" + "✦" * 45 + "\n", 'separador')
-        else:
+        self.text_area.insert(tk.END, f"  ☁️  Nuvens: {atual.nuvens}%\n", 'info')
+
+    def _mostrar_previsao_7dias(self, previsao):
+        """Exibe somente a previsão para os próximos 7 dias."""
+        if not previsao.previsao_7dias:
             self.text_area.insert(tk.END, "\n⚠️ Nenhuma previsão disponível\n", 'erro')
-        
-        # ============ RODAPÉ ============
-        self.text_area.insert(tk.END, f"\n🕐 Atualizado: {atual.atualizado_em.strftime('%d/%m/%Y %H:%M')}\n", 'info')
-        self.text_area.insert(tk.END, "✦" * 45 + "\n", 'separador')
-        self.text_area.insert(tk.END, "💫 Dados fornecidos por Open-Meteo\n", 'info')
-        
-        log.debug(f"Clima de {coords.cidade} atualizado com {len(previsao.previsao_7dias)} dias de previsão")
+            return
+
+        self.text_area.insert(tk.END, "📅 PRÓXIMOS 7 DIAS\n", 'subtitulo')
+        self.text_area.insert(tk.END, "─" * 45 + "\n", 'separador')
+
+        dias_semana = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO']
+        for dia in previsao.previsao_7dias[:7]:
+            nome_dia = dias_semana[dia.data.weekday()]
+            data_formatada = dia.data.strftime('%d/%m')
+            self.text_area.insert(tk.END, f"\n  📆 {nome_dia} - {data_formatada}\n", 'destaque')
+            self.text_area.insert(tk.END, f"     {dia.condicao.icone} {dia.condicao.descricao}\n", 'info')
+            self.text_area.insert(tk.END, f"     🔥 Máx: {dia.temp_max}°C  ❄️ Mín: {dia.temp_min}°C\n", 'neon_laranja')
+            if dia.precipitacao > 0:
+                self.text_area.insert(tk.END, f"     🌧️  Precipitação: {dia.precipitacao} mm\n", 'info')
+            else:
+                self.text_area.insert(tk.END, "     ☀️  Sem chuva prevista\n", 'info')
+
+        self.text_area.insert(tk.END, "\n" + "✦" * 45 + "\n", 'separador')
+
+    def mostrar_detalhes(self):
+        """Mostra detalhes conforme o modo atual da aba."""
+        if not self.previsao:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "⚠️ Nenhum dado disponível\n", 'erro')
+            return
+        self.atualizar(self.previsao)
+
+    def mostrar_previsao(self):
+        """Mostra a previsão da aba atual."""
+        if not self.previsao:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, "⚠️ Nenhum dado disponível\n", 'erro')
+            return
+        self.atualizar(self.previsao)
+
+    def mostrar_erro(self, mensagem: str):
+        """Mostra mensagem de erro"""
+        self.text_area.delete(1.0, tk.END)
+        self.text_area.insert(tk.END, f"❌ {mensagem}\n", 'erro')
     
     def mostrar_detalhes(self):
         """Mostra detalhes completos com previsão"""
