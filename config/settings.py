@@ -47,33 +47,33 @@ class Config:
         self.LOGS_DIR.mkdir(exist_ok=True)
 
         self.THEME_DARK = {
-            'bg': '#0a0a1a',
-            'bg_frame': '#12122a',
-            'bg_card': '#1a1a3e',
-            'neon_rosa': '#ff6b9d',
-            'neon_azul': '#4ecdc4',
-            'neon_verde': '#7bed9f',
-            'neon_roxo': '#a29bfe',
-            'neon_amarelo': '#ffeaa7',
-            'neon_laranja': '#fd79a8',
-            'texto_claro': '#f0f0f0',
-            'neon_dourado': '#ffd700',
-            'neon_vermelho': '#ff4757'
+            'bg': '#0d1321',
+            'bg_frame': '#121d2d',
+            'bg_card': '#1a2940',
+            'neon_rosa': '#ff9ec4',
+            'neon_azul': '#8ecbff',
+            'neon_verde': '#a9f0c9',
+            'neon_roxo': '#d2c0ff',
+            'neon_amarelo': '#fbe7a1',
+            'neon_laranja': '#ffc9a2',
+            'texto_claro': '#f5f1ff',
+            'neon_dourado': '#f7d98a',
+            'neon_vermelho': '#ff8ca8'
         }
 
         self.THEME_LIGHT = {
-            'bg': '#f0f0f0',
-            'bg_frame': '#e0e0e0',
+            'bg': '#f4f0ff',
+            'bg_frame': '#e7e3ff',
             'bg_card': '#ffffff',
-            'neon_rosa': '#e84393',
-            'neon_azul': '#00b894',
-            'neon_verde': '#00b894',
-            'neon_roxo': '#6c5ce7',
-            'neon_amarelo': '#fdcb6e',
-            'neon_laranja': '#e17055',
-            'texto_claro': '#2d3436',
-            'neon_dourado': '#fdcb6e',
-            'neon_vermelho': '#d63031'
+            'neon_rosa': '#ff9ec4',
+            'neon_azul': '#7bb8ff',
+            'neon_verde': '#8fe3b4',
+            'neon_roxo': '#bca5ff',
+            'neon_amarelo': '#f6d77d',
+            'neon_laranja': '#f7be86',
+            'texto_claro': '#24263a',
+            'neon_dourado': '#f0c96a',
+            'neon_vermelho': '#f28cab'
         }
 
 
