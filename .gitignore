@@ -37,45 +37,30 @@ pythonenv*
 *~
 .DS_Store
 
-# Jupyter Notebooks
+# Jupyter
 .ipynb_checkpoints/
 
-# Unit test / coverage reports
+# Testes
+.pytest_cache/
+.coverage
 htmlcov/
 .tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
 
 # Logs
 logs/
 *.log
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Cache
+.cache/
+.cache/
 
-# Python version
-pyvenv.cfg
-
-# mypy
-.mypy_cache/
-.pytest_cache/
-
-# Mapas gerados
+# Arquivos gerados
 *.html
-mapa_*.html
+*.pdf
+*.png
+*.jpg
+*.pkl
+
+# OS
+Thumbs.db
+.DS_Store
