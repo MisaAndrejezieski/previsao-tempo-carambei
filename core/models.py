@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class Coordenadas(BaseModel):
@@ -11,14 +11,16 @@ class Coordenadas(BaseModel):
     cidade: str
     pais: str
     regiao: Optional[str] = None
-    
-    @validator('latitude')
+
+    @field_validator('latitude')
+    @classmethod
     def validar_latitude(cls, v):
         if not -90 <= v <= 90:
             raise ValueError('Latitude inválida')
         return v
-    
-    @validator('longitude')
+
+    @field_validator('longitude')
+    @classmethod
     def validar_longitude(cls, v):
         if not -180 <= v <= 180:
             raise ValueError('Longitude inválida')
